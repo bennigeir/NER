@@ -12,11 +12,18 @@ from transformers import BertForTokenClassification, AdamW
 from tqdm import trange
 from keras.preprocessing.sequence import pad_sequences
 
+from utils import (read_data,
+                   sentence_marker,
+                   clean_data,
+                   write_data,)
+
+
+MASTER = True
+DATA_PATH = 'data/master_corpus.tsv'
 
 # %%
 
-# Read merged dataset
-data = pd.read_csv('master_corpus.tsv', sep="\t")
+data = pd.read_csv(DATA_PATH, sep="\t")
 print(data.head(5))
 
 # %%
@@ -24,20 +31,6 @@ print(data.head(5))
 train = pd.read_csv('data/hrafn/train', sep="\t", names=["Token", "Tag"])
 test = pd.read_csv('data/hrafn/test', sep="\t", names=["Token", "Tag"])
 
-
-# %%
-
-def sentence_marker(dataframe):
-    # Group tokens/words together and mark which belong to the same sentence
-    sentence_no = 0
-    sentences = []
-    
-    for index, row in dataframe.iterrows():
-        sentences.append(sentence_no)
-        if row['Token'] == '.':
-            sentence_no += 1
-            
-    dataframe['Sentence no.'] = sentences
     
 # %%
     
@@ -53,7 +46,7 @@ class SentenceGetter(object):
         self.data = data
         self.empty = False
         agg_func = lambda s: [(w, p) for w, p in zip(s['Token'].values.tolist(),
-                                                           s['Tag'].values.tolist())]
+                                                     s['Tag'].values.tolist())]
         self.grouped = self.data.groupby("Sentence no.").apply(agg_func)
         self.sentences = [s for s in self.grouped]
     

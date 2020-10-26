@@ -13,6 +13,9 @@ from tqdm import trange
 from keras.preprocessing.sequence import pad_sequences
 
 
+# WARNING, EXPECT 5+ HRS RUNNING USING CUDA
+
+
 # %%
 
 # Read merged dataset
