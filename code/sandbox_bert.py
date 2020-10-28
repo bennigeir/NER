@@ -32,12 +32,13 @@ def get_data():
     config = configparser.ConfigParser()
     config.read('config.ini')
     
-    MIM_GOLD_NER_PATH = config['PATHS']['gold_path']
+    MIM_GOLD_NER_FOLDER_PATH = config['PATHS']['gold_path']
+    MIM_GOLD_NER_TSV_FILE = config['PATHS']['tsv_gold_file']
 
     if NEW_DATA:
-        raw_data = read_data(MIM_GOLD_NER_PATH, verbose=VERBOSE)
+        raw_data = read_data(MIM_GOLD_NER_FOLDER_PATH, verbose=VERBOSE)
     else:
-        raw_data = pd.read_csv('master_corpus.tsv', sep="\t")
+        raw_data = pd.read_csv(MIM_GOLD_NER_TSV_FILE, sep="\t")
 
     marked_data = sentence_marker(raw_data, verbose=VERBOSE)
 
@@ -191,7 +192,7 @@ def data_dataloader(tr_inputs, val_inputs, tr_tags, val_tags,
     return train_dataloader, valid_dataloader
 
 
-def fine_tuning():
+def fine_tuning(model):
     # Fine tuning all layers
     FULL_FINETUNING = True
     
@@ -265,12 +266,12 @@ def train_model(tr_inputs, batch_num, num_train_optimization_steps,
     return model
 
 
-def save_model(model, path='models/saved_model'):
+def save_model(model, path='data/models/saved_model'):
     torch.save(model, path)
 
 
-def load_model(path='models/saved_model'):
-    return torch.load('models/saved_model')
+def load_model(path='data/models/saved_model_hrafn'):
+    return torch.load(path)
 
 
 def evaluate(model, valid_dataloader, device, tag2name, write_data=False):
@@ -354,29 +355,27 @@ def evaluate(model, valid_dataloader, device, tag2name, write_data=False):
             writer.write(report)
 
 
-
-
 # %%
 
 data = get_data()
-
 corpus_info(data)
-
 token_sentences, tag_sentences, tag2idx, tag2name = data_preparation(data)
+
 
 # Set up GPU for training
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 n_gpu = torch.cuda.device_count()
 
+
 # Tokenizer using bert-base-multilingual-cased
 tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', 
                                           do_lower_case=False)
-
 tokenized_texts, word_piece_labels = tokenize_labels(token_sentences, tag_sentences)
 
 # Max sentence length. Bert supports sequences of up to 512 tokens, 75 tokens 
 # and a batch size of 32 is suggested by the Bert paper.
 max_len  = 75
+
 
 input_ids, tags = cut_and_pad(tokenized_texts, word_piece_labels, max_len)
 
@@ -389,9 +388,8 @@ tr_inputs, val_inputs, tr_tags, val_tags,tr_masks, val_masks,tr_segs, val_segs\
     = data_to_tensor(tr_inputs, val_inputs, tr_tags, val_tags, tr_masks, 
                      val_masks, tr_segs, val_segs)
 
+
 batch_num = 32
-
-
 train_dataloader, valid_dataloader = data_dataloader(tr_inputs, val_inputs, 
                                                      tr_tags, val_tags,
                                                      tr_masks, val_masks, 
@@ -400,13 +398,12 @@ train_dataloader, valid_dataloader = data_dataloader(tr_inputs, val_inputs,
 # Token-level classifier. Load with 'bert-base-multilingual-cased'
 model = BertForTokenClassification.from_pretrained('bert-base-multilingual-cased',
                                                    num_labels=len(tag2idx))
-
 # Pass parameters to GPU
 model.cuda();
-
 # Support for multiple GPUs
 if n_gpu >1:
     model = torch.nn.DataParallel(model)
+
 
 epochs = 5
 max_grad_norm = 1.0
@@ -414,88 +411,196 @@ max_grad_norm = 1.0
 # Training optimization num
 num_train_optimization_steps = int( math.ceil(len(tr_inputs) / batch_num) / 1) * epochs
 
-optimizer = fine_tuning()
 
+optimizer = fine_tuning(model)
 model = train_model(tr_inputs, batch_num, num_train_optimization_steps,
                     train_dataloader, device, model, max_grad_norm, optimizer)
+
 
 evaluate(model, valid_dataloader, device, tag2name, write_data=True)
 
 
+path = 'data/models/28102020_1'
+save_model(model, path)
+
 # %%
 
+### K-FOLD
+
+# Shuffle
+p = np.random.permutation(len(input_ids))
+
+input_ids = input_ids[p]
+tags = tags[p]
+attention_masks = attention_masks[p]
+segment_ids = segment_ids[p]
 
 
+from sklearn.model_selection import KFold
+n_splits = 10
+
+for train_index, test_index in KFold(n_splits).split(input_ids):
+    torch.cuda.empty_cache()
+    model = BertForTokenClassification.from_pretrained('bert-base-multilingual-cased',
+                                                   num_labels=len(tag2idx))
+    
+    tr_inputs = input_ids[train_index] 
+    val_inputs = input_ids[test_index]
+    tr_tags = tags[train_index] 
+    val_tags = tags[test_index]
+    tr_masks = attention_masks[train_index]
+    val_masks = attention_masks[test_index]
+    tr_segs = segment_ids[train_index]
+    val_segs = segment_ids[test_index]
+    
+    tr_inputs, val_inputs, tr_tags, val_tags,tr_masks, val_masks,tr_segs, val_segs\
+    = data_to_tensor(tr_inputs, val_inputs, tr_tags, val_tags, tr_masks, 
+                     val_masks, tr_segs, val_segs)
+    
+    train_dataloader, valid_dataloader\
+        = data_dataloader(tr_inputs, val_inputs, tr_tags, val_tags, tr_masks, 
+                          val_masks, tr_segs, val_segs, batch_num)
+        
+    # Pass parameters to GPU
+    model.cuda();
+    # Support for multiple GPUs
+    if n_gpu >1:
+        model = torch.nn.DataParallel(model)
+    epochs = 5
+    max_grad_norm = 1.0
+    # Training optimization num
+    num_train_optimization_steps = int( math.ceil(len(tr_inputs) / batch_num) / 1) * epochs
+    
+    optimizer = fine_tuning()
+    
+    model = train_model(tr_inputs, batch_num, num_train_optimization_steps,
+                        train_dataloader, device, model, max_grad_norm, optimizer)
+    
+    optimizer = fine_tuning(model)
+
+    model = train_model(tr_inputs, batch_num, num_train_optimization_steps,
+                    train_dataloader, device, model, max_grad_norm, optimizer)
+
+    evaluate(model, valid_dataloader, device, tag2name, write_data=False)
+    
+
+# %%
+
+# SAVE 
+torch.save(model.state_dict(), 'data/models/28102020_2')
 
 '''
 load_model = load_model()
-# load_config = BertConfig.from_json_file('./tf_model/my_tf_model_config.json')
-# load_model = BertForTokenClassification.from_pretrained('./tf_model/my_tf_checkpoint.ckpt.index', from_tf=True, config=config)
+
+# Set model to GPU
+load_model.cuda();
 '''
 
 # %%
+
+tag2name = {0: 'B-Time',
+ 1: 'B-Person',
+ 2: 'B-Percent',
+ 3: 'I-Location',
+ 4: 'O',
+ 5: 'B-Organization',
+ 6: 'I-Date',
+ 7: 'I-Time',
+ 8: 'I-Organization',
+ 9: 'I-Person',
+ 10: 'B-Date',
+ 11: 'I-Money',
+ 12: 'B-Money',
+ 13: 'B-Miscellaneous',
+ 14: 'I-Miscellaneous',
+ 15: 'I-Percent',
+ 16: 'B-Location',
+ 17: 'X',
+ 18: '[CLS]',
+ 19: '[SEP]'}
+
+# %%
+
+def test_model(test_query, t_model):
+    # Tokenizer using bert-base-multilingual-cased
+    tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', 
+                                              do_lower_case=False)
+    max_len  = 75
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    tokenized_texts = []
+    temp_token = []
+    temp_token.append('[CLS]')
+    token_list = tokenizer.tokenize(test_query)
+    
+    for m,token in enumerate(token_list):
+        temp_token.append(token)
+    
+    if len(temp_token) > max_len-1:
+        temp_token= temp_token[:max_len-1]
+    
+    temp_token.append('[SEP]')
+    
+    tokenized_texts.append(temp_token)
+    
+    input_ids = pad_sequences([tokenizer.convert_tokens_to_ids(txt) for txt in tokenized_texts],
+                              maxlen=max_len, dtype="long", value=0.0, truncating="post", padding="post")
+    
+    attention_masks = [[int(i>0) for i in ii] for ii in input_ids]
+    segment_ids = [[0] * len(input_id) for input_id in input_ids]
+    
+    input_ids = torch.tensor(input_ids).to(torch.int64).to(device)
+    attention_masks = torch.tensor(attention_masks).to(torch.int64).to(device)
+    segment_ids = torch.tensor(segment_ids).to(torch.int64).to(device)
+    
+    t_model.eval();
+    
+    with torch.no_grad():
+            outputs = t_model(input_ids, token_type_ids=None, attention_mask=None,)
+            # For eval mode, the first result of outputs is logits
+            logits = outputs[0]
+    
+    predict_results = logits.detach().cpu().numpy()
+    
+    from scipy.special import softmax
+    
+    result_arrays_soft = softmax(predict_results[0])
+    
+    result_array = result_arrays_soft
+    
+    result_list = np.argmax(result_array,axis=-1)
+    
+    for i, mark in enumerate(attention_masks[0]):
+        if mark>0:
+            print("Token:%s"%(temp_token[i]))
+            # print("Tag:%s"%(result_list[i]))
+            print("Predict_Tag:%s"%(tag2name[result_list[i]]))
+            # print("Posibility:%f"%(result_array[i][result_list[i]]))
+            print()
+
+
+# %%
+
+# load_model = load_model('data/models/28102020_1')
+load_model = torch.load('data/models/28102020_1')
+# Set model to GPU
+load_model.cuda();
+         
+# test_model('19 skjálft­ar yfir 3 að stærð hafa verið staðfest­ir frá stóra skjálft­an­um að sögn Ein­ars Hjör­leifs­son­ar, nátt­úru­vár­sér­fræðings á Veður­stofu Íslands.', load_model)
+# test_model('19 skjálft­ar yfir 3 að stærð hafa verið staðfest­ir frá stóra skjálft­an­um að sögn Ein­ars Hjör­leifs­son­ar, nátt­úru­vár­sér­fræðings á Veður­stofu Íslands.', model)
+
+test_model('19 skjálft­ar yfir 3 að stærð hafa verið staðfest­ir frá stóra skjálft­an­um að sögn Ein­ars Hjör­leifs­son­ar, nátt­úru­vár­sér­fræðings á Veður­stofu Íslands.', load_model)
+
+
+# %%
+
 '''
 
 # LOAD
-# bert_out_address = 'models/bert_out_model/'
-# model = BertForTokenClassification.from_pretrained(bert_out_address,num_labels=len(tag2idx))
-# Set model to GPU
-load_model.cuda();
+load_model_2 = BertForTokenClassification.from_pretrained('bert-base-multilingual-cased',
+                                                   num_labels=len(tag2idx))
+load_model_2.load_state_dict(torch.load('data/models/28102020_2'))
 
-# %%
-
-test_query = """19 skjálft­ar yfir 3 að stærð hafa verið staðfest­ir frá stóra skjálft­an­um að sögn Ein­ars Hjör­leifs­son­ar, nátt­úru­vár­sér­fræðings á Veður­stofu Íslands."""
-# test_query = """Þessar ömmustelpur eru 13 ára í dag. Elsku Þórunn Elísa og Freydís Ólöf. Innilega til hamingju með daginn ykkar."""
-
-tokenized_texts = []
-temp_token = []
-temp_token.append('[CLS]')
-token_list = tokenizer.tokenize(test_query)
-
-print(token_list)
-
-for m,token in enumerate(token_list):
-    temp_token.append(token)
-
-if len(temp_token) > max_len-1:
-    temp_token= temp_token[:max_len-1]
-
-temp_token.append('[SEP]')
-
-tokenized_texts.append(temp_token)
-
-input_ids = pad_sequences([tokenizer.convert_tokens_to_ids(txt) for txt in tokenized_texts],
-                          maxlen=max_len, dtype="long", value=0.0, truncating="post", padding="post")
-
-attention_masks = [[int(i>0) for i in ii] for ii in input_ids]
-segment_ids = [[0] * len(input_id) for input_id in input_ids]
-
-input_ids = torch.tensor(input_ids).to(torch.int64).to(device)
-attention_masks = torch.tensor(attention_masks).to(torch.int64).to(device)
-segment_ids = torch.tensor(segment_ids).to(torch.int64).to(device)
-
-load_model.eval();
-
-with torch.no_grad():
-        outputs = load_model(input_ids, token_type_ids=None, attention_mask=None,)
-        # For eval mode, the first result of outputs is logits
-        logits = outputs[0]
-
-predict_results = logits.detach().cpu().numpy()
-
-from scipy.special import softmax
-
-result_arrays_soft = softmax(predict_results[0])
-
-result_array = result_arrays_soft
-
-result_list = np.argmax(result_array,axis=-1)
-
-for i, mark in enumerate(attention_masks[0]):
-    if mark>0:
-        print("Token:%s"%(temp_token[i]))
-#         print("Tag:%s"%(result_list[i]))
-        print("Predict_Tag:%s"%(tag2name[result_list[i]]))
-        #print("Posibility:%f"%(result_array[i][result_list[i]]))
-        print()
+test_model('19 skjálft­ar yfir 3 að stærð hafa verið staðfest­ir frá stóra skjálft­an­um að sögn Ein­ars Hjör­leifs­son­ar, nátt­úru­vár­sér­fræðings á Veður­stofu Íslands.', load_model_2)
+test_model('19 skjálft­ar yfir 3 að stærð hafa verið staðfest­ir frá stóra skjálft­an­um að sögn Ein­ars Hjör­leifs­son­ar, nátt­úru­vár­sér­fræðings á Veður­stofu Íslands.', model)
 '''
