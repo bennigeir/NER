@@ -10,10 +10,10 @@ def read_data(path, verbose=False):
     # Iterate through files in MIM GOLD NER and MIM GOLD 1.0 and merge them
     try:
         files = [f for f in os.listdir(path)]
+        # files = [os.path.join(path, 'blog.txt')]
         for file in files:
             if verbose:
                 print('Reading {}...'.format(file))
-                print(os.path.join(path, file))
             ner_data = pd.read_csv(os.path.join(path, file), 
                                    sep="\t", 
                                    header=None)

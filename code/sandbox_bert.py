@@ -8,6 +8,7 @@ import calendar
 import time
 
 from seqeval.metrics import classification_report,accuracy_score,f1_score
+
 from transformers import BertTokenizer
 from torch.utils.data import TensorDataset, DataLoader, RandomSampler, SequentialSampler
 from sklearn.model_selection import train_test_split
@@ -267,7 +268,8 @@ def train_model(tr_inputs, batch_num, num_train_optimization_steps,
 
 
 def save_model(model, path='data/models/saved_model'):
-    torch.save(model, path)
+    # torch.save(model, path)
+    torch.save(model.state_dict(), path)
 
 
 def load_model(path='data/models/saved_model_hrafn'):
@@ -417,10 +419,10 @@ model = train_model(tr_inputs, batch_num, num_train_optimization_steps,
                     train_dataloader, device, model, max_grad_norm, optimizer)
 
 
-evaluate(model, valid_dataloader, device, tag2name, write_data=True)
+evaluate(model, valid_dataloader, device, tag2name, write_data=False)
 
 
-path = 'data/models/28102020_1'
+path = 'data/models/29102020_1'
 save_model(model, path)
 
 # %%
@@ -494,113 +496,4 @@ load_model = load_model()
 
 # Set model to GPU
 load_model.cuda();
-'''
-
-# %%
-
-tag2name = {0: 'B-Time',
- 1: 'B-Person',
- 2: 'B-Percent',
- 3: 'I-Location',
- 4: 'O',
- 5: 'B-Organization',
- 6: 'I-Date',
- 7: 'I-Time',
- 8: 'I-Organization',
- 9: 'I-Person',
- 10: 'B-Date',
- 11: 'I-Money',
- 12: 'B-Money',
- 13: 'B-Miscellaneous',
- 14: 'I-Miscellaneous',
- 15: 'I-Percent',
- 16: 'B-Location',
- 17: 'X',
- 18: '[CLS]',
- 19: '[SEP]'}
-
-# %%
-
-def test_model(test_query, t_model):
-    # Tokenizer using bert-base-multilingual-cased
-    tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', 
-                                              do_lower_case=False)
-    max_len  = 75
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
-    tokenized_texts = []
-    temp_token = []
-    temp_token.append('[CLS]')
-    token_list = tokenizer.tokenize(test_query)
-    
-    for m,token in enumerate(token_list):
-        temp_token.append(token)
-    
-    if len(temp_token) > max_len-1:
-        temp_token= temp_token[:max_len-1]
-    
-    temp_token.append('[SEP]')
-    
-    tokenized_texts.append(temp_token)
-    
-    input_ids = pad_sequences([tokenizer.convert_tokens_to_ids(txt) for txt in tokenized_texts],
-                              maxlen=max_len, dtype="long", value=0.0, truncating="post", padding="post")
-    
-    attention_masks = [[int(i>0) for i in ii] for ii in input_ids]
-    segment_ids = [[0] * len(input_id) for input_id in input_ids]
-    
-    input_ids = torch.tensor(input_ids).to(torch.int64).to(device)
-    attention_masks = torch.tensor(attention_masks).to(torch.int64).to(device)
-    segment_ids = torch.tensor(segment_ids).to(torch.int64).to(device)
-    
-    t_model.eval();
-    
-    with torch.no_grad():
-            outputs = t_model(input_ids, token_type_ids=None, attention_mask=None,)
-            # For eval mode, the first result of outputs is logits
-            logits = outputs[0]
-    
-    predict_results = logits.detach().cpu().numpy()
-    
-    from scipy.special import softmax
-    
-    result_arrays_soft = softmax(predict_results[0])
-    
-    result_array = result_arrays_soft
-    
-    result_list = np.argmax(result_array,axis=-1)
-    
-    for i, mark in enumerate(attention_masks[0]):
-        if mark>0:
-            print("Token:%s"%(temp_token[i]))
-            # print("Tag:%s"%(result_list[i]))
-            print("Predict_Tag:%s"%(tag2name[result_list[i]]))
-            # print("Posibility:%f"%(result_array[i][result_list[i]]))
-            print()
-
-
-# %%
-
-# load_model = load_model('data/models/28102020_1')
-load_model = torch.load('data/models/28102020_1')
-# Set model to GPU
-load_model.cuda();
-         
-# test_model('19 skjálft­ar yfir 3 að stærð hafa verið staðfest­ir frá stóra skjálft­an­um að sögn Ein­ars Hjör­leifs­son­ar, nátt­úru­vár­sér­fræðings á Veður­stofu Íslands.', load_model)
-# test_model('19 skjálft­ar yfir 3 að stærð hafa verið staðfest­ir frá stóra skjálft­an­um að sögn Ein­ars Hjör­leifs­son­ar, nátt­úru­vár­sér­fræðings á Veður­stofu Íslands.', model)
-
-test_model('19 skjálft­ar yfir 3 að stærð hafa verið staðfest­ir frá stóra skjálft­an­um að sögn Ein­ars Hjör­leifs­son­ar, nátt­úru­vár­sér­fræðings á Veður­stofu Íslands.', load_model)
-
-
-# %%
-
-'''
-
-# LOAD
-load_model_2 = BertForTokenClassification.from_pretrained('bert-base-multilingual-cased',
-                                                   num_labels=len(tag2idx))
-load_model_2.load_state_dict(torch.load('data/models/28102020_2'))
-
-test_model('19 skjálft­ar yfir 3 að stærð hafa verið staðfest­ir frá stóra skjálft­an­um að sögn Ein­ars Hjör­leifs­son­ar, nátt­úru­vár­sér­fræðings á Veður­stofu Íslands.', load_model_2)
-test_model('19 skjálft­ar yfir 3 að stærð hafa verið staðfest­ir frá stóra skjálft­an­um að sögn Ein­ars Hjör­leifs­son­ar, nátt­úru­vár­sér­fræðings á Veður­stofu Íslands.', model)
 '''

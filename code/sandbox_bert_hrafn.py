@@ -33,9 +33,32 @@ test = pd.read_csv('data/hrafn/test', sep="\t", names=["Token", "Tag"])
 
     
 # %%
+
+def sentence_marker(dataframe, verbose=False):
+    out = dataframe.copy()
+    if verbose:
+        print('Running sentence_marker...')
+    # Group tokens/words together and mark which belong to the same sentence
+    sentence_no = 0
+    sentences = []
     
-sentence_marker(train)
-sentence_marker(test)
+    for index, row in out.iterrows():
+        sentences.append(sentence_no)
+        if row['Token'] == '.':
+            sentence_no += 1
+            
+    out['Sentence no.'] = sentences
+    if verbose:
+        print('Done')
+        
+    # out = out.drop(columns=['index'])
+        
+    return out
+
+# %%
+    
+train = sentence_marker(train)
+test = sentence_marker(test)
 
 # %%
 
@@ -371,9 +394,7 @@ for _ in trange(epochs, desc="Epoch"):
 
 # %%
     
-from transformers import BertConfig
 
-torch.save(model, 'models/saved_model_hrafn')
 
 # %%
 
@@ -450,7 +471,7 @@ print("Accuracy score: %f"%(accuracy_score(y_true, y_pred)))
 report = classification_report(y_true, y_pred,digits=4)
 
 # Save the report into file
-output_eval_file = "eval_results.txt"
+output_eval_file = "eval_results_hrafn_29102020.txt"
 with open(output_eval_file, "w") as writer:
     print("***** Eval results *****")
     print("\n%s"%(report))
@@ -463,6 +484,9 @@ with open(output_eval_file, "w") as writer:
     writer.write(str(accuracy_score(y_true, y_pred)))
     writer.write("\n\n")  
     writer.write(report)
+    
+torch.save(model.state_dict(), 'data/models/saved_model_hrafn_29102020')
+
 
     # %%
 

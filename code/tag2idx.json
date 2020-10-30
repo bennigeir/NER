@@ -1,0 +1,1 @@
+{"I-Time": 0, "I-Money": 1, "B-Date": 2, "I-Person": 3, "B-Percent": 4, "I-Location": 5, "B-Time": 6, "B-Person": 7, "B-Miscellaneous": 8, "I-Percent": 9, "I-Miscellaneous": 10, "I-Date": 11, "I-Organization": 12, "B-Organization": 13, "B-Money": 14, "B-Location": 15, "O": 16, "X": 17, "[CLS]": 18, "[SEP]": 19}
