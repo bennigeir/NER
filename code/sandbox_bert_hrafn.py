@@ -495,7 +495,7 @@ torch.save(model.state_dict(), 'data/models/saved_model_hrafn_29102020')
 # bert_out_address = 'models/bert_out_model/'
 # model = BertForTokenClassification.from_pretrained(bert_out_address,num_labels=len(tag2idx))
 # Set model to GPU
-load_model.cuda();
+# load_model.cuda();
 
 # %%
 

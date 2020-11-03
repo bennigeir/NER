@@ -8,31 +8,27 @@ Created on Thu Oct 29 20:19:14 2020
 import json
 import torch
 import numpy as np
+import configparser
 
 from keras.preprocessing.sequence import pad_sequences
 from transformers import (BertForTokenClassification,
                           BertTokenizer,
                           )
 
-SAVED_MODEL_PATH = 'data/models/28102020_2'
-TAG2IDX_PATH = 'tag2idx.json'
-TAG2NAME_PATH = 'tag2name.json'
 
-
-def get_tag2idx():   
-    with open(TAG2IDX_PATH) as json_file:
+def get_tag2idx(file_path):   
+    with open(file_path) as json_file:
         tag2idx = json.load(json_file) 
     return tag2idx
 
 
-def get_tag2name():   
-    with open(TAG2NAME_PATH) as json_file:
+def get_tag2name(file_path):   
+    with open(file_path) as json_file:
         tag2name = json.load(json_file) 
     return tag2name
     
 
-def test_model(test_query, t_model):
-    # Tokenizer using bert-base-multilingual-cased
+def test_model(test_query, t_model, tag2name):
     tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', 
                                               do_lower_case=False)
     max_len  = 75
@@ -54,7 +50,8 @@ def test_model(test_query, t_model):
     tokenized_texts.append(temp_token)
     
     input_ids = pad_sequences([tokenizer.convert_tokens_to_ids(txt) for txt in tokenized_texts],
-                              maxlen=max_len, dtype="long", value=0.0, truncating="post", padding="post")
+                              maxlen=max_len, dtype="long", value=0.0, 
+                              truncating="post", padding="post")
     
     attention_masks = [[int(i>0) for i in ii] for ii in input_ids]
     segment_ids = [[0] * len(input_id) for input_id in input_ids]
@@ -66,8 +63,7 @@ def test_model(test_query, t_model):
     t_model.eval();
     
     with torch.no_grad():
-            outputs = t_model(input_ids, token_type_ids=None, attention_mask=None,)
-            # For eval mode, the first result of outputs is logits
+            outputs = t_model(input_ids, token_type_ids=None, attention_mask=None)
             logits = outputs[0]
     
     predict_results = logits.detach().cpu().numpy()
@@ -80,31 +76,38 @@ def test_model(test_query, t_model):
     
     result_list = np.argmax(result_array,axis=-1)
     
-    tag2name = get_tag2name()
+    test = [x[0:2] != '##' for x in temp_token]
+    test = np.where(test)
     
-    for i, mark in enumerate(attention_masks[0]):
-        if mark>0:
-            print("Token:%s"%(temp_token[i]))
-            # print("Tag:%s"%(result_list[i]))
-            print("Predict_Tag:%s"%(tag2name[str(result_list[i])]))
-            # print("Posibility:%f"%(result_array[i][result_list[i]]))
-            print()
+    temp_string = ' '.join(temp_token).replace(' ##', '')
+    temp_string_list = temp_string.split(' ')
+    
+    out = []
+    for i,j in zip(range(len(temp_string_list)), test[0]):
+        out.append((temp_string_list[i], tag2name[str(result_list[j])]))
+    return out
             
-            
-# %%
 
-        
-tag2idx = get_tag2idx()
-model = BertForTokenClassification.from_pretrained('bert-base-multilingual-cased',
-                                                   num_labels=len(tag2idx))
+def run_model(test_query): 
 
-model.load_state_dict(torch.load(SAVED_MODEL_PATH))
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model.to(device)
-model.eval()
-
-test_query = '''að sögn Ein­ars Hjör­leifs­son­ar, nátt­úru­vár­sér­fræðings á 
-Veður­stofu Íslands.'''
-
-test_model(test_query, model)
+    config = configparser.ConfigParser()
+    config.read('config.ini')
+    
+    SAVED_MODEL_PATH = config['PATHS']['model_default_load']
+    TAG2IDX_PATH = config['PATHS']['tag2idx']
+    TAG2NAME_PATH = config['PATHS']['tag2name']
+           
+    tag2idx = get_tag2idx(TAG2IDX_PATH)
+    tag2name = get_tag2name(TAG2NAME_PATH)
+    model = BertForTokenClassification.from_pretrained('bert-base-multilingual-cased',
+                                                       num_labels=len(tag2idx))
+    
+    model.load_state_dict(torch.load(SAVED_MODEL_PATH))
+    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    model.eval()
+    
+    out = test_model(test_query, model, tag2name)
+    
+    return out

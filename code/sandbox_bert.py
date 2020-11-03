@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 import torch.nn.functional as F
 import torch
 import math
@@ -26,20 +25,12 @@ VERBOSE = True
 NEW_DATA = True
 
 
-# %%
-
-
-def get_data():
-    config = configparser.ConfigParser()
-    config.read('config.ini')
-    
-    MIM_GOLD_NER_FOLDER_PATH = config['PATHS']['gold_path']
-    MIM_GOLD_NER_TSV_FILE = config['PATHS']['tsv_gold_file']
+def get_data(ner_path, tsv_path):
 
     if NEW_DATA:
-        raw_data = read_data(MIM_GOLD_NER_FOLDER_PATH, verbose=VERBOSE)
+        raw_data = read_data(ner_path, verbose=VERBOSE)
     else:
-        raw_data = pd.read_csv(MIM_GOLD_NER_TSV_FILE, sep="\t")
+        raw_data = pd.read_csv(tsv_path, sep="\t")
 
     marked_data = sentence_marker(raw_data, verbose=VERBOSE)
 
@@ -50,12 +41,14 @@ def get_data():
 
 def corpus_info(data):
     # Info on dataset
-    token_count = data['Token'].nunique()
+    token_count = data['Token'].shape[0]
+    u_token_count = data['Token'].nunique()
     tag_count = data['Tag'].nunique()
     sentences_count = data['Sentence no.'].nunique()
     
     print('Token count: {}'.format(token_count))
-    print('Tag count: {}'.format(tag_count))
+    print('Unique token count: {}'.format(u_token_count))
+    print('Unique tag count: {}'.format(tag_count))
     print('Sentence count: {}'.format(sentences_count))
 
 
@@ -83,7 +76,7 @@ def data_preparation(data):
     return token_sentences, tag_sentences, tag2idx, tag2name
     
 
-def tokenize_labels(token_sentences, tag_sentences):
+def tokenize_labels(token_sentences, tag_sentences, tokenizer):
     tokenized_texts = []
     word_piece_labels = []
     
@@ -125,7 +118,8 @@ def tokenize_labels(token_sentences, tag_sentences):
     return tokenized_texts, word_piece_labels
 
   
-def cut_and_pad(tokenized_texts, word_piece_labels, max_len):
+def cut_and_pad(tokenized_texts, word_piece_labels, max_len, tokenizer,
+                tag2idx):
     
     # Pad or trim sentences to match max sentence length
     input_ids = pad_sequences([tokenizer.convert_tokens_to_ids(txt) for txt in tokenized_texts],
@@ -218,7 +212,8 @@ def fine_tuning(model):
 
 
 def train_model(tr_inputs, batch_num, num_train_optimization_steps,
-                train_dataloader, device, model, max_grad_norm, optimizer):
+                train_dataloader, device, model, max_grad_norm,
+                optimizer, n_gpu, epochs):
 
     model.train();
     
@@ -276,7 +271,8 @@ def load_model(path='data/models/saved_model_hrafn'):
     return torch.load(path)
 
 
-def evaluate(model, valid_dataloader, device, tag2name, write_data=False):
+def evaluate(model, valid_dataloader, device, tag2name, val_inputs, batch_num,
+             write_data=False):
 
     model.eval();
     # model.eval();
@@ -286,10 +282,10 @@ def evaluate(model, valid_dataloader, device, tag2name, write_data=False):
     y_true = []
     y_pred = []
     
-    if VERBOSE:
-        print("***** Running evaluation *****")
-        print("  Num examples ={}".format(len(val_inputs)))
-        print("  Batch size = {}".format(batch_num))
+    # if VERBOSE:
+    print("***** Running evaluation *****")
+    print("  Num examples ={}".format(len(val_inputs)))
+    print("  Batch size = {}".format(batch_num))
         
     for step, batch in enumerate(valid_dataloader):
         batch = tuple(t.to(device) for t in batch)
@@ -332,9 +328,9 @@ def evaluate(model, valid_dataloader, device, tag2name, write_data=False):
             y_true.append(temp_1)
             y_pred.append(temp_2)
     
-    if VERBOSE:
-        print("f1 socre: %f"%(f1_score(y_true, y_pred)))
-        print("Accuracy score: %f"%(accuracy_score(y_true, y_pred)))
+    # if VERBOSE:
+    print("f1 socre: %f"%(f1_score(y_true, y_pred)))
+    print("Accuracy score: %f"%(accuracy_score(y_true, y_pred)))
     
     # Get acc , recall, F1 result report
     report = classification_report(y_true, y_pred,digits=4)
@@ -357,143 +353,79 @@ def evaluate(model, valid_dataloader, device, tag2name, write_data=False):
             writer.write(report)
 
 
-# %%
-
-data = get_data()
-corpus_info(data)
-token_sentences, tag_sentences, tag2idx, tag2name = data_preparation(data)
-
-
-# Set up GPU for training
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-n_gpu = torch.cuda.device_count()
-
-
-# Tokenizer using bert-base-multilingual-cased
-tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', 
-                                          do_lower_case=False)
-tokenized_texts, word_piece_labels = tokenize_labels(token_sentences, tag_sentences)
-
-# Max sentence length. Bert supports sequences of up to 512 tokens, 75 tokens 
-# and a batch size of 32 is suggested by the Bert paper.
-max_len  = 75
-
-
-input_ids, tags = cut_and_pad(tokenized_texts, word_piece_labels, max_len)
-
-attention_masks, segment_ids = fine_tune_prep(input_ids)
-
-tr_inputs, val_inputs, tr_tags, val_tags,tr_masks, val_masks,tr_segs, val_segs\
-    = split_train_test(input_ids, tags,attention_masks, segment_ids)
+def main():
     
-tr_inputs, val_inputs, tr_tags, val_tags,tr_masks, val_masks,tr_segs, val_segs\
-    = data_to_tensor(tr_inputs, val_inputs, tr_tags, val_tags, tr_masks, 
-                     val_masks, tr_segs, val_segs)
-
-
-batch_num = 32
-train_dataloader, valid_dataloader = data_dataloader(tr_inputs, val_inputs, 
-                                                     tr_tags, val_tags,
-                                                     tr_masks, val_masks, 
-                                                     tr_segs, val_segs, batch_num)
-
-# Token-level classifier. Load with 'bert-base-multilingual-cased'
-model = BertForTokenClassification.from_pretrained('bert-base-multilingual-cased',
-                                                   num_labels=len(tag2idx))
-# Pass parameters to GPU
-model.cuda();
-# Support for multiple GPUs
-if n_gpu >1:
-    model = torch.nn.DataParallel(model)
-
-
-epochs = 5
-max_grad_norm = 1.0
-
-# Training optimization num
-num_train_optimization_steps = int( math.ceil(len(tr_inputs) / batch_num) / 1) * epochs
-
-
-optimizer = fine_tuning(model)
-model = train_model(tr_inputs, batch_num, num_train_optimization_steps,
-                    train_dataloader, device, model, max_grad_norm, optimizer)
-
-
-evaluate(model, valid_dataloader, device, tag2name, write_data=False)
-
-
-path = 'data/models/29102020_1'
-save_model(model, path)
-
-# %%
-
-### K-FOLD
-
-# Shuffle
-p = np.random.permutation(len(input_ids))
-
-input_ids = input_ids[p]
-tags = tags[p]
-attention_masks = attention_masks[p]
-segment_ids = segment_ids[p]
-
-
-from sklearn.model_selection import KFold
-n_splits = 10
-
-for train_index, test_index in KFold(n_splits).split(input_ids):
-    torch.cuda.empty_cache()
-    model = BertForTokenClassification.from_pretrained('bert-base-multilingual-cased',
-                                                   num_labels=len(tag2idx))
+    config = configparser.ConfigParser()
+    config.read('config.ini')
     
-    tr_inputs = input_ids[train_index] 
-    val_inputs = input_ids[test_index]
-    tr_tags = tags[train_index] 
-    val_tags = tags[test_index]
-    tr_masks = attention_masks[train_index]
-    val_masks = attention_masks[test_index]
-    tr_segs = segment_ids[train_index]
-    val_segs = segment_ids[test_index]
+    MIM_GOLD_NER_FOLDER_PATH = config['PATHS']['gold_path']
+    MIM_GOLD_NER_TSV_FILE = config['PATHS']['tsv_gold_file']
+    
+    
+    data = get_data(MIM_GOLD_NER_FOLDER_PATH, MIM_GOLD_NER_TSV_FILE)
+    corpus_info(data)
+    token_sentences, tag_sentences, tag2idx, tag2name = data_preparation(data)
+    
+    # Set up GPU for training
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    n_gpu = torch.cuda.device_count()
+    
+    # Tokenizer using bert-base-multilingual-cased
+    tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', 
+                                               do_lower_case=False)
+    
+    tokenized_texts, word_piece_labels = tokenize_labels(token_sentences, 
+                                                         tag_sentences, 
+                                                         tokenizer)
+    
+    # Max sentence length. Bert supports sequences of up to 512 tokens, 75 tokens 
+    # and a batch size of 32 is suggested by the Bert paper.
+    max_len  = 75
+    
+    
+    input_ids, tags = cut_and_pad(tokenized_texts, word_piece_labels, max_len,
+                                  tokenizer, tag2idx)
+    
+    attention_masks, segment_ids = fine_tune_prep(input_ids)
     
     tr_inputs, val_inputs, tr_tags, val_tags,tr_masks, val_masks,tr_segs, val_segs\
-    = data_to_tensor(tr_inputs, val_inputs, tr_tags, val_tags, tr_masks, 
-                     val_masks, tr_segs, val_segs)
-    
-    train_dataloader, valid_dataloader\
-        = data_dataloader(tr_inputs, val_inputs, tr_tags, val_tags, tr_masks, 
-                          val_masks, tr_segs, val_segs, batch_num)
+        = split_train_test(input_ids, tags,attention_masks, segment_ids)
         
+    tr_inputs, val_inputs, tr_tags, val_tags,tr_masks, val_masks,tr_segs, val_segs\
+        = data_to_tensor(tr_inputs, val_inputs, tr_tags, val_tags, tr_masks, 
+                         val_masks, tr_segs, val_segs)
+    
+    
+    batch_num = 32
+    train_dataloader, valid_dataloader = data_dataloader(tr_inputs, val_inputs, 
+                                                         tr_tags, val_tags,
+                                                         tr_masks, val_masks, 
+                                                         tr_segs, val_segs, 
+                                                         batch_num)
+    
+    # Token-level classifier. Load with 'bert-base-multilingual-cased'
+    model = BertForTokenClassification.from_pretrained('bert-base-multilingual-cased',
+                                                       num_labels=len(tag2idx))
     # Pass parameters to GPU
     model.cuda();
     # Support for multiple GPUs
     if n_gpu >1:
         model = torch.nn.DataParallel(model)
+    
     epochs = 5
     max_grad_norm = 1.0
+    
     # Training optimization num
-    num_train_optimization_steps = int( math.ceil(len(tr_inputs) / batch_num) / 1) * epochs
-    
-    optimizer = fine_tuning()
-    
-    model = train_model(tr_inputs, batch_num, num_train_optimization_steps,
-                        train_dataloader, device, model, max_grad_norm, optimizer)
+    num_train_optimization_steps = int(math.ceil(len(tr_inputs) / batch_num) / 1) * epochs
     
     optimizer = fine_tuning(model)
-
     model = train_model(tr_inputs, batch_num, num_train_optimization_steps,
-                    train_dataloader, device, model, max_grad_norm, optimizer)
-
-    evaluate(model, valid_dataloader, device, tag2name, write_data=False)
+                        train_dataloader, device, model, max_grad_norm,
+                        optimizer, n_gpu, epochs)
     
+    evaluate(model, valid_dataloader, device, tag2name, val_inputs, batch_num, 
+             write_data=True)
 
-# %%
 
-# SAVE 
-torch.save(model.state_dict(), 'data/models/28102020_2')
-
-'''
-load_model = load_model()
-
-# Set model to GPU
-load_model.cuda();
-'''
+if __name__ == "__main__":
+    main()
