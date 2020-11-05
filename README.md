@@ -16,3 +16,126 @@ The folder [code](https://github.com/bennigeir/NER/tree/main/code) contains all 
  - `test_ner.py` : Test a query of you choosing on the trained model
 
 The folder [files](https://github.com/bennigeir/NER/tree/main/files) contains nothing important, only files associated with the final report.
+
+---------------------
+
+# Named Entity Recognition for Icelandic API
+
+A fine tuned BERT multilingual model for NER for Icelandic is at service on 'www.ice-bert-ner.com'.
+
+## Open Endpoints
+
+Open endpoints require no Authentication.
+
+* NER : `GET ?query=`
+* Example: 
+    `www.ice-bert-ner.com?query=Erna Sif er lektor við verkfræði- og tölvunarfræðideildir HR og forstöðumaður Svefnseturs sem nýlega var sett á fót með styrk frá Innviðasjóði.`
+
+    Response:
+    ```json
+    "results": [
+        [
+            "[CLS]",
+            "[CLS]"
+        ],
+        [
+            "Erna",
+            "B-Person"
+        ],
+        [
+            "Sif",
+            "I-Person"
+        ],
+        [
+            "er",
+            "O"
+        ],
+        [
+            "lektor",
+            "O"
+        ],
+        [
+            "við",
+            "O"
+        ],
+        [
+            "verkfræði",
+            "O"
+        ],
+        [
+            "-",
+            "X"
+        ],
+        [
+            "og",
+            "O"
+        ],
+        [
+            "tölvunarfræðideildir",
+            "O"
+        ],
+        [
+            "HR",
+            "B-Organization"
+        ],
+        [
+            "og",
+            "O"
+        ],
+        [
+            "forstöðumaður",
+            "O"
+        ],
+        [
+            "Svefnseturs",
+            "B-Organization"
+        ],
+        [
+            "sem",
+            "O"
+        ],
+        [
+            "nýlega",
+            "O"
+        ],
+        [
+            "var",
+            "O"
+        ],
+        [
+            "sett",
+            "O"
+        ],
+        [
+            "á",
+            "O"
+        ],
+        [
+            "fót",
+            "O"
+        ],
+        [
+            "með",
+            "O"
+        ],
+        [
+            "styrk",
+            "O"
+        ],
+        [
+            "frá",
+            "O"
+        ],
+        [
+            "Innviðasjóði",
+            "B-Organization"
+        ],
+        [
+            ".",
+            "O"
+        ],
+        [
+            "[SEP]",
+            "[SEP]"
+        ]
+    ]
