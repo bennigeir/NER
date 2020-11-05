@@ -27,9 +27,9 @@ A fine tuned BERT multilingual model for NER for Icelandic is at service on 'www
 
 Open endpoints require no Authentication.
 
-* NER : `GET ?query=`
+* NER : `GET /NER/?query=`
 * Example: 
-    `www.ice-bert-ner.com?query=Erna Sif er lektor við verkfræði- og tölvunarfræðideildir HR og forstöðumaður Svefnseturs sem nýlega var sett á fót með styrk frá Innviðasjóði.`
+    `www.ice-bert-ner.com/NER/?query=Erna Sif er lektor við verkfræði- og tölvunarfræðideildir HR og forstöðumaður Svefnseturs sem nýlega var sett á fót með styrk frá Innviðasjóði.`
 
     Response:
     ```json
