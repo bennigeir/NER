@@ -56,10 +56,11 @@ def main():
     
     # Max sentence length. Bert supports sequences of up to 512 tokens, 75 tokens 
     # and a batch size of 32 is suggested by the Bert paper.
-    max_len  = 75
+    # max_len  = 75
+    max_len = 100
     
     input_ids, tags = cut_and_pad(tokenized_texts, word_piece_labels, max_len,
-                                  tokenizer)
+                                  tokenizer, tag2idx)
     attention_masks, segment_ids = fine_tune_prep(input_ids)
     
     attention_masks = np.array(attention_masks)
@@ -107,17 +108,12 @@ def main():
     
         num_train_optimization_steps = int(math.ceil(len(tr_inputs) / BATCH_NUM) / 1) * epochs
         
-        optimizer = fine_tuning()
+        optimizer = fine_tuning(model)
         
         model = train_model(tr_inputs, BATCH_NUM, num_train_optimization_steps,
                             train_dataloader, device, model, max_grad_norm, 
-                            optimizer, epochs)
-        
-        optimizer = fine_tuning(model)
-    
-        model = train_model(tr_inputs, BATCH_NUM, num_train_optimization_steps,
-                        train_dataloader, device, model, max_grad_norm, optimizer)
-    
+                            optimizer, n_gpu, epochs)
+            
         evaluate(model, valid_dataloader, device, tag2name, val_inputs, 
                  BATCH_NUM, write_data=True)
         

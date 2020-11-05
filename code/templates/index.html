@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bootstrap 101 Template</title>
+
+    <!-- Bootstrap -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+	
+
+    <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+      <div class="jumbotron jumbotron-fluid">
+  <div class="container">
+    <h1 class="display-1">NER for Icelandic - API</h1>
+    <p class="lead">A fine tuned BERT multilingual model for NER for Icelandic at your service.</p>
+    <hr>
+    <p class="lead">Open endpoints require no Authentication.</p>
+
+    <p class="lead">NER : GET ?query=</p>
+    
+    <p class="lead">Example: <a href="www.ice-bert-ner.com?query=Erna Sif er lektor við verkfræði- og tölvunarfræðideildir HR og forstöðumaður Svefnseturs sem nýlega var sett á fót með styrk frá Innviðasjóði." target="_blank">www.ice-bert-ner.com?query=Erna Sif er lektor við verkfræði- og tölvunarfræðideildir HR og forstöðumaður Svefnseturs sem nýlega var sett á fót með styrk frá Innviðasjóði.</a></p>
+    
+    <p class="lead">Response:</p>
+    
+    <pre id="json">"results": [
+        [
+            "[CLS]",
+            "[CLS]"
+        ],
+        [
+            "Erna",
+            "B-Person"
+        ],
+        [
+            "Sif",
+            "I-Person"
+        ],
+        [
+            "er",
+            "O"
+        ],
+        [
+            "lektor",
+            "O"
+        ],
+        [
+            "við",
+            "O"
+        ],
+        [
+            "verkfræði",
+            "O"
+        ],
+        [
+            "-",
+            "X"
+        ],
+        [
+            "og",
+            "O"
+        ],
+        [
+            "tölvunarfræðideildir",
+            "O"
+        ],
+        [
+            "HR",
+            "B-Organization"
+        ],
+        [
+            "og",
+            "O"
+        ],
+        [
+            "forstöðumaður",
+            "O"
+        ],
+        [
+            "Svefnseturs",
+            "B-Organization"
+        ],
+        [
+            "sem",
+            "O"
+        ],
+        [
+            "nýlega",
+            "O"
+        ],
+        [
+            "var",
+            "O"
+        ],
+        [
+            "sett",
+            "O"
+        ],
+        [
+            "á",
+            "O"
+        ],
+        [
+            "fót",
+            "O"
+        ],
+        [
+            "með",
+            "O"
+        ],
+        [
+            "styrk",
+            "O"
+        ],
+        [
+            "frá",
+            "O"
+        ],
+        [
+            "Innviðasjóði",
+            "B-Organization"
+        ],
+        [
+            ".",
+            "O"
+        ],
+        [
+            "[SEP]",
+            "[SEP]"
+        ]
+    ]</pre>
+      </div>
+    </div>
+
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+  </body>
+</html>
