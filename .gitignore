@@ -1,2 +1,5 @@
 code/models/
 models/
+code/data/MIM*/
+code/data/hrafn/
+code/data/master_corpus.tsv
