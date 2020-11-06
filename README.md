@@ -21,7 +21,7 @@ The folder [files](https://github.com/bennigeir/NER/tree/main/files) contains no
 
 # Named Entity Recognition for Icelandic API
 
-A fine tuned BERT multilingual model for NER for Icelandic is at service on 'www.ice-bert-ner.com'.
+A fine tuned BERT multilingual model for NER for Icelandic is at service on www.ice-bert-ner.com.
 
 ## Open Endpoints
 
