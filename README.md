@@ -1,7 +1,7 @@
 # NER
 T-725-MALV Final Project: 1.2 Named Entity Recognition (NER)
 
-Report: https://www.overleaf.com/project/5f8188ba3d401d0001288493
+Report: https://github.com/bennigeir/NER/tree/main/files/report/final_report.pdf
 
 This repository is part of a final project in the course **T-725-MALV, Natural Language Processing** taught by Hrafn Loftsson and Hannes Högni Vilhjálmsson at Reykjavík University.
 In this project we apply BERT to an Icelandic NER corpus. By applying 10-fold cross-validation we obtain an F1-score of 89.24.
