@@ -2,7 +2,7 @@
 T-725-MALV Final Project: 1.2 Named Entity Recognition (NER)
 
 This repository is part of a final project in the course **T-725-MALV, Natural Language Processing** taught by Hrafn Loftsson and Hannes Högni Vilhjálmsson at Reykjavík University.
-In this project we apply BERT to an Icelandic NER corpus. By applying 10-fold cross-validation we obtain an F1-score of 89.24.
+In this project a BERT model is applied to an Icelandic NER corpus. The model is evaluated using 10-fold cross-validation, and from this evaluation an F1-score of 89.24 is obtained.
 
 The folder [code](https://github.com/bennigeir/NER/tree/main/code) contains all code, utils and configs for the project.
  - `10_fold_eval.py` : 10-fold cross-validation of the model produced
@@ -13,7 +13,7 @@ The folder [code](https://github.com/bennigeir/NER/tree/main/code) contains all 
  - `sandbox_bert_hrafn.py` : Same as `sandbox_bert.py` but with predefined train and test datasets
  - `test_ner.py` : Test a query of you choosing on the trained model
 
-The folder [files](https://github.com/bennigeir/NER/tree/main/files) contains nothing important, only files associated with the final report.
+The folder [files](https://github.com/bennigeir/NER/tree/main/files) contains nothing important, only files associated with the [final report](https://github.com/bennigeir/NER/blob/main/files/report/NER.pdf).
 
 ---------------------
 
